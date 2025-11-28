@@ -101,9 +101,29 @@ val screenName = "スクリーン名"
 AimstarInAppMessaging.fetch(activity = this@MainActivity, screenName = screenName)
 ```
 
+#### カスタムパラメータの設定
+
+`fetch` メソッドには、カスタムパラメータを渡すことができます。カスタムパラメータは、管理画面側でのメッセージの表示条件などに使用できます。
+
+カスタムパラメータを指定する場合は、ビルダーを使用してパラメータを設定します：
+
+```kotlin
+AimstarInAppMessaging.fetch(activity = this@MainActivity, screenName = screenName) {
+    putString("user_type", "premium")
+    putInt("product_id", 12345)
+}
+```
+
+利用可能なメソッド：
+
+- `putString(_:value:)` - 指定したキーに対して文字列値を設定
+- `putInt(_:value:)` - 指定したキーに対して整数値を設定
+
 ---
 
 # 利用ガイド
+
+> **注意**: ポップアップバナーと埋め込みバナーは現在開発中です。これらの機能を使用する際は、仕様が変更される可能性があることにご注意ください。
 
 ## 基本的な使い方
 
@@ -131,6 +151,12 @@ class MainActivity : AppCompatActivity() {
 
         // ページ閲覧イベントを送信
         AimstarInAppMessaging.fetch(activity = this, screenName = "home")
+
+        // カスタムパラメータを渡す場合の例
+        // AimstarInAppMessaging.fetch(activity = this, screenName = "home") {
+        //     putString("user_type", "premium")
+        //     putInt("product_id", 12345)
+        // }
     }
     
     private fun onLoginSuccess(userId: String) {
@@ -355,6 +381,12 @@ class MainActivity : AppCompatActivity() {
 
         // コンテンツを読み込むためにfetchを呼び出す
         AimstarInAppMessaging.fetch(activity = this, screenName = "your_screen_name")
+
+        // カスタムパラメータを渡す場合の例
+        // AimstarInAppMessaging.fetch(activity = this, screenName = "your_screen_name") {
+        //     putString("user_type", "premium")
+        //     putInt("product_id", 12345)
+        // }
     }
 }
 ```
@@ -663,7 +695,27 @@ SDKの初期化を行います。
 fun fetch(activity: Activity, screenName: String)
 ```
 
-任意のタイミングでこのメソッドを呼び出すと、SDKが指定されたscreenNameでメッセージを取得します。メッセージが取得できた場合、指定されたactivityが表示されているウインドウ上にメッセージUIが表示されます。
+任意のタイミングでこのメソッドを呼び出すと、SDKが指定された screenName でメッセージを取得します。メッセージが取得できた場合、指定された activity が表示されているウインドウ上にメッセージUIが表示されます。
+
+### fetch(activity, screenName, customParams: ((CustomParamsBuilder) -> Unit)? = null)
+
+```kotlin
+fun fetch(activity: Activity, screenName: String, customParams: ((CustomParamsBuilder) -> Unit)? = null)
+```
+
+カスタムパラメータを指定してメッセージを取得します。`customParams` ビルダー内で、パラメータを設定できます。これらのパラメータは管理画面側でのメッセージの表示条件などに使用できます。
+
+```kotlin
+AimstarInAppMessaging.fetch(activity = this@MainActivity, screenName = screenName) {
+    putString("user_type", "premium")
+    putInt("product_id", 12345)
+}
+```
+
+利用可能なメソッド：
+
+- `putString(_:value:)` - 指定したキーに対して文字列値を設定
+- `putInt(_:value:)` - 指定したキーに対して整数値を設定
 
 ## AimstarInAppMessagingListener
 

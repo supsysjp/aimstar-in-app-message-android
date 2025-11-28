@@ -689,7 +689,7 @@ fun setup(context: Context, apiKey: String, tenantId: String)
 
 SDKの初期化を行います。
 
-### fetch(activity, screenName)
+### fetch(activity:screenName:)
 
 ```kotlin
 fun fetch(activity: Activity, screenName: String)
@@ -697,7 +697,7 @@ fun fetch(activity: Activity, screenName: String)
 
 任意のタイミングでこのメソッドを呼び出すと、SDKが指定された screenName でメッセージを取得します。メッセージが取得できた場合、指定された activity が表示されているウインドウ上にメッセージUIが表示されます。
 
-### fetch(activity, screenName, customParams: ((CustomParamsBuilder) -> Unit)? = null)
+### fetch(activity:screenName:customParams:)
 
 ```kotlin
 fun fetch(activity: Activity, screenName: String, customParams: ((CustomParamsBuilder) -> Unit)? = null)

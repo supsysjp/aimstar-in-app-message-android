@@ -1,109 +1,291 @@
-# Aimstar Messaging SDK
+# AIMSTAR In-App Messaging Android SDK
+
+AIMSTAR で設定されたアプリ内メッセージを Android アプリ上で表示するための SDK です。
+
 ## Requirements
 
-MinSDK - 23
+| 項目 | バージョン |
+| - | - |
+| minSdk | 26 以上 |
+| compileSdk / targetSdk | 36 |
 
-CompileSDK - 33
-
-TargetSDK - 33
-
-## 制限事項
-
-- 後述する `5.ページ閲覧イベントの送出` 実行後にポップアップが表示される可能性がありますが、現時点では表示を抑制する機能が存在しないため、ポップアップ表示時には実行しないなどの排他制御を行なっていただく必要がございます
-
-## SDKで提供する機能
+## SDKで提供する機能について
 
 - アプリのページ閲覧イベントを送信する
-- 対象と判定されたユーザーに、ポップアップを表示する
-- ポップアップ表示、ユーザー操作による非表示、コンバージョンボタンのタップの各イベントを送信する
+- 対象と判定されたユーザーに、以下の3種類のメッセージを表示する
+  - **ポップアップモーダル**: 画面中央に表示されるモーダルダイアログ
+  - **ポップアップバナー**: 画面上部/中央/下部に表示されるバナー（位置は9箇所から指定可能）
+  - **埋め込みバナー**: アプリの任意の場所に埋め込み表示するバナー
+- メッセージの表示、ユーザー操作による非表示、コンバージョンボタンのタップの各イベントを送信する
+- View / Jetpack Compose の両方に対応
 
 ## 用語
 
 | 用語 | 説明 |
-| --- | --- |
-| API Key | AimstarMessagingSDK を利用するために必要な API キーで、Aimstar 側で事前にアプリ開発者に発行されます。 |
-| Tenant ID | AimstarMessagingSDK を利用するために必要なテナント ID で、Aimstar 側で事前にアプリ開発者に発行されます。 |
+| - | - |
+| API Key | AimstarInAppMessaging を利用するために必要な API キーで、AIMSTAR 側で事前にアプリ開発者に発行されます。 |
+| Tenant ID | AimstarInAppMessaging を利用するために必要なテナント ID で、AIMSTAR 側で事前にアプリ開発者に発行されます。 |
 | Customer ID | アプリ開発者がユーザーを識別する ID で、アプリ開発者が独自に発行、生成、または利用します。 |
 | ScreenName | アプリ側で設定するトリガーの一種（アプリ開発者が任意に設定する識別名）で、ユーザーが特定の画面を表示したり、またはアクションを行うなどの条件を満たした場合に、識別名を使ってメッセージを呼び出すために利用されます。 |
+| ComponentID | 埋め込みバナーを識別するための文字列 ID です。AIMSTAR 管理画面で設定した値と、アプリ側で指定する値を一致させる必要があります。 |
 
 ## 導入手順
 
-### 1.SDKをアプリに追加する
+### 1. SDKをアプリに追加する
 
-このリポジトリの `app/libs/AimstarMessagingSDK.aar` をダウンロードし、aar ファイルをプロジェクトに含めて実装を進めてください。
+[Releases](https://github.com/supsysjp/aimstar-in-app-message-android/releases) から `AimstarMessagingSdk.aar` をダウンロードし、プロジェクトの `app/libs/` ディレクトリに配置してください。
 
-### 2.SDKのイベントリスナーと初期化コードを追加する
-
-`onCreate` 内にイベントハンドラと初期化コードを追加します。
+次に、`app/build.gradle.kts` に以下を追記します。
 
 ```kotlin
-class YourApplication : Application() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+dependencies {
+    implementation(fileTree(mapOf("dir" to "libs", "include" to arrayOf("*.aar"))))
+}
+```
 
-        // リスナーの設定を行う
-        AimstarInAppMessaging.listener = object : AimstarInAppMessagingListener {
+### 2. SDKの初期化とイベントリスナーを設定する
+
+`Application` クラスの `onCreate()` 内に初期化コードを追加します。
+
+```kotlin
+import jp.co.aimstar.messaging.android.AimstarInAppMessaging
+import jp.co.aimstar.messaging.android.AimstarInAppMessagingListener
+import jp.co.aimstar.messaging.android.AimstarException
+import jp.co.aimstar.messaging.android.model.InAppMessage
+
+class YourApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+
+        // イベントリスナーを設定します（任意）
+        AimstarInAppMessaging.setListener(object : AimstarInAppMessagingListener {
             override fun messageDismissed(message: InAppMessage) {
-                // ポップアップが非表示になったタイミングで実行
+                // メッセージが非表示になったタイミングで実行
             }
             override fun messageClicked(message: InAppMessage) {
-                // ポップアップ内のボタンがタップされたタイミングで実行
+                // メッセージ内のボタンがタップされたタイミングで実行
             }
             override fun messageDetectedForDisplay(message: InAppMessage) {
-                // 表示対象のメッセージが見つかった際に実行。この後ポップアップが表示される
+                // 表示対象のメッセージが見つかった際に実行。この後メッセージが表示される
             }
             override fun messageError(message: InAppMessage?, error: AimstarException) {
                 // SDK内でエラーが発生した際に実行
             }
-        }
+        })
 
-        // SDKの初期化を行う
+        // SDKの初期化を行います
         val API_KEY = "発行されたAPI KEY"
         val TENANT_ID = "発行されたテナントID"
         AimstarInAppMessaging.setup(context = applicationContext, apiKey = API_KEY, tenantId = TENANT_ID)
     }
 }
-
 ```
 
-### 3.Customer IDの設定
+### 3. Customer IDの設定
 
 SDKの初期化後に必要に応じてCustomer IDを設定してください。
 
 ```kotlin
 // アプリにユーザーがログインした後など、ユーザーが識別できるようになった後に実行
 AimstarInAppMessaging.customerId = "ユーザーを識別するID"
-
 ```
 
-### ユーザーのログイン・ログアウト状態の判定
+#### ユーザーのログイン・ログアウト状態の判定
 
-`AimstarInAppMessaging.customerId` にユーザーIDが設定されているかどうかで状態が判定されます。従って、ユーザーがログアウトを実行した際には `null` を設定いただく必要がございます。
+`AimstarInAppMessaging.customerId` にユーザーIDが設定されているかどうかで状態が判定されます。従って、ユーザーがログアウトを実行した際には `null` を設定してください。
 
 ```kotlin
 // アプリからユーザーがログアウト後に実行
 AimstarInAppMessaging.customerId = null
-
 ```
 
-### 4.isStrictLoginフラグの設定
+### 4. isStrictLoginフラグの設定
 
-ユーザーのログイン・ログアウト状態を厳密に判定する場合は `true` を設定していただく必要があります。初期値は `false` です。
+ユーザーのログイン・ログアウト状態を厳密に判定する場合は `true` を設定してください。初期値は `false` です。
 
 ```kotlin
 AimstarInAppMessaging.isStrictLogin = true
-
 ```
 
-### 5.ページ閲覧イベントの送出
+### 5. メッセージの取得と表示
 
 スクリーン名を設定して `fetch` メソッドを実行します。
 
-```kotlin
-val screenName = "スクリーン名"
-AimstarInAppMessaging.fetch(activity = this@MainActivity, screenName = screenName)
+#### View
 
+```kotlin
+// シンプルな呼び出し
+AimstarInAppMessaging.fetch(activity = this, screenName = "Your Screen Name")
 ```
+
+ポップアップバナーの表示位置をカスタムヘッダーやナビゲーションバーなどのUI要素に合わせて調整するには、`topAnchor` / `bottomAnchor` を指定してください。
+
+```kotlin
+// ヘッダーの下端〜ナビゲーションバーの上端の範囲内にバナーを表示する
+AimstarInAppMessaging.fetch(
+    activity = this,
+    screenName = "Your Screen Name",
+    topAnchor = headerView,
+    bottomAnchor = navigationBarView
+)
+```
+
+#### Jetpack Compose
+
+Compose環境では、`topOffsetPx` / `bottomOffsetPx` でバナーの表示位置をpx単位で指定します。
+
+```kotlin
+AimstarInAppMessaging.fetch(
+    activity = this,
+    screenName = "Your Screen Name",
+    topOffsetPx = topBarHeightPx,
+    bottomOffsetPx = bottomBarHeightPx
+)
+```
+
+#### 埋め込みバナー
+
+アプリの任意の場所にバナーを埋め込む場合は、埋め込みバナーコンポーネントを使用します。埋め込みバナーのコンテンツを読み込むには、`fetch` の呼び出しが必要です。
+
+**View (XMLレイアウト):**
+
+```xml
+<jp.co.aimstar.messaging.android.ui.view.IAMEmbeddedBannerView
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:componentId="your_component_id" />
+```
+
+```kotlin
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        AimstarInAppMessaging.fetch(activity = this, screenName = "Your Screen Name")
+    }
+}
+```
+
+**Jetpack Compose:**
+
+```kotlin
+import jp.co.aimstar.messaging.android.ui.view.IAMEmbeddedBanner
+
+@Composable
+fun SomeScreen() {
+    Column {
+        IAMEmbeddedBanner(
+            componentId = "your_component_id",
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp)
+        )
+    }
+}
+```
+
+```kotlin
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        AimstarInAppMessaging.fetch(activity = this, screenName = "Your Screen Name")
+
+        setContent {
+            YourAppTheme {
+                SomeScreen()
+            }
+        }
+    }
+}
+```
+
+### 6. カスタムパラメータの送信
+
+`fetch` メソッドにカスタムパラメータを付与できます。カスタムパラメータは、管理画面側でのメッセージの表示条件などに使用できます。
+
+```kotlin
+AimstarInAppMessaging.fetch(activity = this, screenName = "Your Screen Name") {
+    putString("category", "electronics")
+    putInteger("age", 25)
+    putBoolean("is_premium", true)
+    putDouble("price", 99.9)
+    putStringList("tags", listOf("sale", "new"))
+}
+```
+
+対応する型: `putString`, `putInteger`, `putDouble`, `putBoolean`, `putStringList`, `putIntegerList`, `putDoubleList`, `putBooleanList`
+
+---
+
+# 利用ガイド
+
+## fetch 呼び出しのタイミング制御
+
+SDK にはポップアップの表示を抑制する機能がありません。メッセージを表示したくないタイミングがある場合は、`messageDetectedForDisplay` / `messageDismissed` リスナーを活用し、アプリ側で `fetch` 呼び出しを制御してください。
+
+以下はポップアップ表示中に新たな `fetch` を呼び出さないようにするパターンの例です。
+
+```kotlin
+class YourApplication : Application() {
+    private var isMessageDisplayed = false
+
+    override fun onCreate() {
+        super.onCreate()
+
+        AimstarInAppMessaging.setListener(object : AimstarInAppMessagingListener {
+            override fun messageDetectedForDisplay(message: InAppMessage) {
+                isMessageDisplayed = true
+            }
+            override fun messageDismissed(message: InAppMessage) {
+                isMessageDisplayed = false
+            }
+        })
+
+        AimstarInAppMessaging.setup(context = applicationContext, apiKey = API_KEY, tenantId = TENANT_ID)
+    }
+
+    fun fetchIfReady(activity: Activity, screenName: String) {
+        if (!isMessageDisplayed) {
+            AimstarInAppMessaging.fetch(activity = activity, screenName = screenName)
+        }
+    }
+}
+```
+
+## 複数メッセージの処理
+
+同一の `fetch` 呼び出しで複数のメッセージが取得された場合、表示ルールは以下のとおりです。
+
+- **ポップアップモーダル**: 最初の1件のみ表示されます
+- **ポップアップバナー**: 表示位置が重ならないよう、位置ごとに最初の1件のみ表示されます
+- **埋め込みバナー**: `componentId` で指定した位置に対応するメッセージが表示されます
+
+## 埋め込みバナーの実装時の注意点
+
+- `componentId` は AIMSTAR 管理画面で確認できる識別子です。定数として管理することを推奨します
+- 存在しない `componentId` を指定した場合、バナーは表示されません（エラーにはなりません）
+- 埋め込みバナーのコンテンツを更新したい場合は、再度 `fetch` を呼び出してください
+
+## トラブルシューティング
+
+### メッセージが表示されない場合
+
+以下の項目を順番に確認してください。
+
+1. `setup()` が `Application.onCreate()` 内で正しく呼び出されているか
+2. `isStrictLogin = true` に設定している場合、`customerId` が設定されているか
+3. `fetch` に渡している `screenName` が AIMSTAR 管理画面の設定と一致しているか
+4. ネットワーク接続に問題がないか
+5. `messageDetectedForDisplay` リスナーが呼び出されているか（呼び出されていない場合、表示対象のメッセージが存在しないか、条件を満たしていない可能性があります）
+
+### エラーが発生する場合
+
+`messageError` リスナーで受け取った `AimstarException` の内容を確認してください。
+
+- `ClientError`: API Key または Tenant ID が正しく設定されているか確認してください
+- `ServerError` / `NetworkError`: 時間をおいて再試行してください
 
 ---
 
@@ -113,102 +295,181 @@ AimstarInAppMessaging.fetch(activity = this@MainActivity, screenName = screenNam
 
 ```kotlin
 object AimstarInAppMessaging
-
 ```
 
-SDKのエントリーポイントです。
-
-setupメソッドを通じて初期化を行います。初期化が行われていない場合は、SDKの機能が利用できません。
+SDKのエントリーポイントです。`setup` メソッドを通じて初期化を行います。初期化が行われていない場合は、SDKの機能が利用できません。
 
 ### Properties
 
-### listener: AimstarInAppMessagingListener? (任意)
-
-```kotlin
-var listener: AimstarInAppMessagingListener? = null
-
-```
-
-SDK側で発生したイベントをアプリ側に通知するためのリスナーオブジェクトです。イベントをアプリ側で補足したい場合に使います。
-
-### isStrictLogin: Boolean
-
-```kotlin
-var isStrictLogin = false
-
-```
-
-このメンバを`true`にすると、ユーザーのログイン・ログアウト状態を厳密に判定するようになります。
-
-### customerId: String?
+#### customerId: String?
 
 ```kotlin
 var customerId: String? = null
-
 ```
 
-ユーザーのIDを設定します。
+ユーザーのIDを設定します。`null` が設定されている場合は、ログアウト状態として扱われます。
 
-nullが設定されている場合は、ログアウト状態として扱われます。
+#### isStrictLogin: Boolean
+
+```kotlin
+var isStrictLogin: Boolean = false
+```
+
+このプロパティを `true` にすると、ユーザーのログイン・ログアウト状態を厳密に判定するようになります。初期値は `false` です。
 
 ### Functions
 
-### setup(context: Context, apiKey: String, tenantId: String)
+#### setup(context, apiKey, tenantId)
 
 ```kotlin
 fun setup(context: Context, apiKey: String, tenantId: String)
-
 ```
 
 SDKの初期化を行います。
 
-### fetch(activity, screenName)
+#### setup(context, apiKey, tenantId, apiHost)
 
 ```kotlin
-fun fetch(activity: Activity, screenName: String)
-
+fun setup(context: Context, apiKey: String, tenantId: String, apiHost: String)
 ```
 
-任意のタイミングでこのメソッドを呼び出すと、SDKが指定されたscreenNameでメッセージを取得します。メッセージが取得できた場合、指定されたactivityが表示されているウインドウ上にメッセージUIが表示されます。
+APIホストを指定してSDKの初期化を行います。
+
+#### setListener(listener)
+
+```kotlin
+fun setListener(listener: AimstarInAppMessagingListener)
+```
+
+イベント通知用リスナーを設定します。
+
+#### fetch(activity, screenName, topAnchor?, bottomAnchor?, customBlock?)
+
+```kotlin
+fun fetch(
+    activity: Activity,
+    screenName: String,
+    topAnchor: View? = null,
+    bottomAnchor: View? = null,
+    customBlock: CustomParameterBuilder.() -> Unit = {}
+)
+```
+
+指定した screenName でメッセージを取得・表示します（View アンカー指定）。`topAnchor` はポップアップバナー（TOP）の上端基準となる View、`bottomAnchor` はポップアップバナー（BOTTOM）の下端基準となる View です。
+
+#### fetch(activity, screenName, topOffsetPx, bottomOffsetPx, customBlock?)
+
+```kotlin
+fun fetch(
+    activity: Activity,
+    screenName: String,
+    topOffsetPx: Int,
+    bottomOffsetPx: Int,
+    customBlock: CustomParameterBuilder.() -> Unit = {}
+)
+```
+
+px オフセット指定でメッセージを取得・表示します（Compose 向け）。`topOffsetPx` はウィンドウ上端からの絶対距離、`bottomOffsetPx` はウィンドウ下端からの絶対距離です。
 
 ## AimstarInAppMessagingListener
 
-interfaceです。このリスナーを実装したオブジェクトを作成し、以下の4つのメソッドをオーバーライドすることで利用します。
+```kotlin
+interface AimstarInAppMessagingListener
+```
+
+このリスナーを実装したオブジェクトを `setListener` で設定することで、SDK側で発生したイベントをアプリ側に通知することができます。すべてのメソッドにデフォルト実装が提供されているため、必要なメソッドのみ実装できます。
 
 ### Functions
 
-### messageDismissed(InAppMessage)
+#### messageDismissed(message)
 
 ```kotlin
 fun messageDismissed(message: InAppMessage)
-
 ```
 
 メッセージUIが表示された後、閉じられる際にコールされます。
 
-### messageClicked(InAppMessage)
+#### messageClicked(message)
 
 ```kotlin
 fun messageClicked(message: InAppMessage)
-
 ```
 
 メッセージUIでユーザーによるポジティブなタップアクション（OKボタンのタップ）を行った際にコールされます。
 
-### messageDetectedForDisplay(InAppMessage)
+#### messageDetectedForDisplay(message)
 
 ```kotlin
 fun messageDetectedForDisplay(message: InAppMessage)
-
 ```
 
 メッセージUIを表示すべき対象のメッセージが取得された際にコールされます。
 
-### messageError(InAppMessage?, AimstarException)
+#### messageError(message, error)
 
 ```kotlin
 fun messageError(message: InAppMessage?, error: AimstarException)
-
 ```
 
 SDK内でメッセージの取得や表示の際にエラーが発生した場合にコールされます。
+
+## IAMEmbeddedBannerView (View)
+
+```kotlin
+class IAMEmbeddedBannerView : FrameLayout
+```
+
+View環境（XML レイアウト）用の埋め込みバナーコンポーネントです。`app:componentId` 属性で ComponentID を指定します。
+
+## IAMEmbeddedBanner (Compose)
+
+```kotlin
+@Composable
+fun IAMEmbeddedBanner(componentId: String, modifier: Modifier = Modifier)
+```
+
+Jetpack Compose 用の埋め込みバナーコンポーネントです。`componentId` を指定して利用します。
+
+## CustomParameterBuilder
+
+`fetch()` の `customBlock` ラムダで使用するカスタムパラメータビルダーです。
+
+| メソッド | 説明 |
+| - | - |
+| `putString(key, value)` | 文字列パラメータを追加する。 |
+| `putInteger(key, value)` | 整数パラメータを追加する。 |
+| `putDouble(key, value)` | 浮動小数点パラメータを追加する。 |
+| `putBoolean(key, value)` | 真偽値パラメータを追加する。 |
+| `putStringList(key, value)` | 文字列リストパラメータを追加する。 |
+| `putIntegerList(key, value)` | 整数リストパラメータを追加する。 |
+| `putDoubleList(key, value)` | 浮動小数点リストパラメータを追加する。 |
+| `putBooleanList(key, value)` | 真偽値リストパラメータを追加する。 |
+
+## AimstarException
+
+エラー種別を表す sealed class です。
+
+```kotlin
+sealed class AimstarException : Exception()
+```
+
+| サブクラス | 説明 |
+| - | - |
+| `Precondition(msg)` | 内部不整合などの前提条件エラー。リトライ不可。 |
+| `ClientError(httpStatusCode)` | 4xx レスポンスに起因するクライアントエラー。リトライ不可。 |
+| `ServerError(httpStatusCode)` | 5xx レスポンスに起因するサーバーエラー。リトライ可能。 |
+| `NetworkError(exception)` | ネットワーク通信エラー。リトライ可能。 |
+
+## InAppMessage
+
+```kotlin
+sealed class InAppMessage
+```
+
+SDKが取り扱うメッセージの型です。リスナーメソッドの引数として渡されます。
+
+| サブクラス | 説明 |
+| - | - |
+| `PopupModalMessage` | ポップアップモーダルのメッセージ。 |
+| `PopupBannerMessage` | ポップアップバナーのメッセージ。 |
+| `EmbeddedBannerMessage` | 埋め込みバナーのメッセージ。 |

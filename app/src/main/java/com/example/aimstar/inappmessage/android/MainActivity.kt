@@ -8,8 +8,8 @@ import androidx.core.content.edit
 import com.example.aimstar.inappmessage.android.databinding.ActivityMainBinding
 import jp.co.aimstar.messaging.android.AimstarInAppMessaging
 import jp.co.aimstar.messaging.android.AimstarInAppMessagingListener
-import jp.co.aimstar.messaging.android.data.http.AimstarException
-import jp.co.aimstar.messaging.android.data.model.InAppMessage
+import jp.co.aimstar.messaging.android.AimstarException
+import jp.co.aimstar.messaging.android.model.InAppMessage
 
 class MainActivity : AppCompatActivity() {
     companion object {
@@ -45,7 +45,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         val view = binding.root
         setContentView(view)
-        AimstarInAppMessaging.listener = object : AimstarInAppMessagingListener {
+        AimstarInAppMessaging.setListener(object : AimstarInAppMessagingListener {
             override fun messageDismissed(message: InAppMessage) {
                 Log.d("MainActivity", "messageDismissed")
             }
@@ -61,7 +61,7 @@ class MainActivity : AppCompatActivity() {
             override fun messageError(message: InAppMessage?, error: AimstarException) {
                 Log.d("MainActivity", "messageError")
             }
-        }
+        })
         binding.button.apply {
             setOnClickListener {
                 val tenantId = binding.tenantIdTextView.text.toString()
@@ -74,7 +74,7 @@ class MainActivity : AppCompatActivity() {
                 AimstarInAppMessaging.customerId = customerId
                 AimstarInAppMessaging.isStrictLogin = binding.strictLoginCheckbox.isChecked
                 val screenName = binding.screenNameTextView.text.toString()
-                AimstarInAppMessaging.fetch(activity = this@MainActivity, screenName = screenName)
+                AimstarInAppMessaging.screenView(activity = this@MainActivity, screenName = screenName)
             }
         }
     }

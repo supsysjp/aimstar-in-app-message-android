@@ -6,7 +6,7 @@ AIMSTAR で設定されたアプリ内メッセージを Android アプリ上で
 
 | 項目 | バージョン |
 | - | - |
-| minSdk | 26 以上 |
+| minSdk | 28 以上 |
 | compileSdk / targetSdk | 36 |
 
 ## SDKで提供する機能について
@@ -325,7 +325,7 @@ var isStrictLogin: Boolean = false
 fun setup(context: Context, apiKey: String, tenantId: String, apiHost: String? = null)
 ```
 
-SDKの初期化を行います。`apiHost` を省略または `null` にすると本番エンドポイントを使用します。`apiHost` を指定する場合は `https://` または `http://` で始まる URL を渡してください。スキームなしの文字列を渡した場合は `IllegalArgumentException` がスローされます。
+SDKの初期化を行います。`apiHost` を省略または `null` にすると本番エンドポイントを使用します。`apiHost` を指定する場合は有効な `http` / `https` URL を渡してください。有効な URL でない値を渡した場合は例外を投げず、新しい構成は適用されません（後続の `screenView` で `messageError` に `AimstarException.Precondition` が通知されます）。
 
 #### setListener(listener)
 
@@ -395,7 +395,7 @@ fun messageClicked(message: InAppMessage)
 fun messageDetectedForDisplay(message: InAppMessage)
 ```
 
-メッセージUIを表示すべき対象のメッセージが取得された際にコールされます。このコールバックが呼ばれた時点で OPEN リアクションがサーバーに送信されます（メッセージがユーザーに可視になった時点）。
+メッセージUIを表示すべき対象のメッセージが検出された際にコールされます。このコールバックが呼ばれた時点ではまだメッセージはユーザーに可視とは限りません。OPEN リアクションは、メッセージがユーザーに可視になった時点で別途サーバーに送信されます。
 
 #### messageError(message, error)
 

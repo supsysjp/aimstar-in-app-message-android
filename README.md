@@ -57,7 +57,7 @@ class YourApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // イベントリスナーを設定します（任意）
+        // イベントリスナーを設定します（任意）。全メソッドにデフォルト実装があるため、必要なメソッドのみ実装できます
         AimstarInAppMessaging.setListener(object : AimstarInAppMessagingListener {
             override fun messageDismissed(message: InAppMessage) {
                 // メッセージが非表示になったタイミングで実行
@@ -66,7 +66,7 @@ class YourApplication : Application() {
                 // メッセージ内のボタンがタップされたタイミングで実行
             }
             override fun messageDetectedForDisplay(message: InAppMessage) {
-                // 表示対象のメッセージが見つかった際に実行。この後メッセージが表示される
+                // 表示対象のメッセージが検出された際に実行
             }
             override fun messageError(message: InAppMessage?, error: AimstarException) {
                 // SDK内でエラーが発生した際に実行
@@ -147,13 +147,16 @@ AimstarInAppMessaging.screenView(
 
 アプリの任意の場所にバナーを埋め込む場合は、埋め込みバナーコンポーネントを使用します。埋め込みバナーのコンテンツを読み込むには、`screenView` の呼び出しが必要です。
 
+デフォルトでは、コンテンツのロード中はバナー領域が高さ 0 に折りたたまれ、表示可能になった時点でバナーが現れます。ロード中にプレースホルダー（shimmer）を表示したい場合は、`showsLoadingPlaceholder` を `true` に設定してください。
+
 **View (XMLレイアウト):**
 
 ```xml
 <jp.co.aimstar.messaging.android.ui.view.IAMEmbeddedBannerView
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    app:componentId="your_component_id" />
+    app:componentId="your_component_id"
+    app:showsLoadingPlaceholder="true" />
 ```
 
 ```kotlin
@@ -179,7 +182,8 @@ fun SomeScreen() {
             componentId = "your_component_id",
             modifier = Modifier
                 .fillMaxWidth()
-                .height(100.dp)
+                .height(100.dp),
+            showsLoadingPlaceholder = true
         )
     }
 }
@@ -225,7 +229,7 @@ AimstarInAppMessaging.screenView(activity = this, screenName = "Your Screen Name
 
 SDK にはポップアップの表示を抑制する機能がありません。メッセージを表示したくないタイミングがある場合は、`messageDetectedForDisplay` / `messageDismissed` リスナーを活用し、アプリ側で `screenView` 呼び出しを制御してください。
 
-以下はポップアップ表示中に新たな `screenView` を呼び出さないようにするパターンの例です。
+`screenName` または Activity が変わる呼び出しでは、表示中のポップアップが撤去されます（詳細は「[同一画面で再度 screenView を呼び出した場合](#同一画面で再度-screenview-を呼び出した場合)」を参照）。画面遷移で表示中のメッセージを消したくない場合や、そもそもメッセージを出したくないタイミングがある場合は、以下のように `screenView` の呼び出し自体を制御してください。
 
 ```kotlin
 class YourApplication : Application() {
@@ -262,11 +266,33 @@ class YourApplication : Application() {
 - **ポップアップバナー**: 表示位置が重ならないよう、位置ごとに最初の1件のみ表示されます
 - **埋め込みバナー**: `componentId` で指定した位置に対応するメッセージが表示されます
 
+## 同一画面で再度 screenView を呼び出した場合
+
+同じ `screenName`・同じ Activity で再度 `screenView` を呼び出した場合（コンテンツの更新、pull-to-refresh、画面復帰など）、表示中のポップアップは原則として維持されます。ポップアップバナーとポップアップモーダルで挙動が異なります。
+
+**ポップアップバナー**
+
+- **表示中のバナー**: そのまま表示され続けます。ユーザーが閉じた時点で、新しい取得結果に含まれる同じ位置のバナーが表示されます
+- **同一シナリオの再取得**: 表示中のものと同じシナリオが再度取得された場合、二重に表示されることはありません
+- **配信が止まった位置**: 新しい取得結果にその位置のバナーが含まれない場合、表示中のバナーは撤去されます
+
+**ポップアップモーダル**
+
+- **配信が止まった場合**: 新しい取得結果にモーダルが含まれない場合でも、表示中のモーダルは**撤去されません**。ユーザーが閉じるまで表示され続けます
+- **新しいモーダルの取得**: 表示中のモーダルは撤去され、新しいモーダルに差し替わります。同一シナリオが再度取得された場合も表示し直されるため、モーダルが重なって表示されることはありません
+
+**共通**
+
+- **`screenName` または Activity が変わる呼び出し**: 表示中のポップアップはバナー・モーダルともすべて撤去されます
+
+`screenName` は「同じ画面かどうか」の判定に使われます。**内容が変わる画面に同一の `screenName` を使い回すと、前の内容向けのバナーが次の内容の画面に残る場合があります。** 論理的な画面ごとに一意な `screenName` を指定してください。
+
 ## 埋め込みバナーの実装時の注意点
 
 - `componentId` は AIMSTAR 管理画面で確認できる識別子です。定数として管理することを推奨します
 - 存在しない `componentId` を指定した場合、バナーは表示されません（エラーにはなりません）
 - 埋め込みバナーのコンテンツを更新したい場合は、再度 `screenView` を呼び出してください
+- デフォルトではロード中にバナー領域が高さ 0 に折りたたまれます。ロード中に shimmer プレースホルダーを表示するには `showsLoadingPlaceholder` を `true` に設定してください（View: `app:showsLoadingPlaceholder` 属性または同名プロパティ、Compose: 同名パラメータ）
 
 ## トラブルシューティング
 
@@ -275,10 +301,11 @@ class YourApplication : Application() {
 以下の項目を順番に確認してください。
 
 1. `setup()` が `Application.onCreate()` 内で正しく呼び出されているか
-2. `isStrictLogin = true` に設定している場合、`customerId` が設定されているか
-3. `screenView` に渡している `screenName` が AIMSTAR 管理画面の設定と一致しているか
-4. ネットワーク接続に問題がないか
-5. `messageDetectedForDisplay` リスナーが呼び出されているか（呼び出されていない場合、表示対象のメッセージが存在しないか、条件を満たしていない可能性があります）
+2. `screenView` を Main スレッドから呼び出しているか（Main スレッド以外から呼び出した場合、処理は行われず `messageError` に `AimstarException.Precondition` が通知されます）
+3. `isStrictLogin = true` に設定している場合、`customerId` が設定されているか
+4. `screenView` に渡している `screenName` が AIMSTAR 管理画面の設定と一致しているか
+5. ネットワーク接続に問題がないか
+6. `messageDetectedForDisplay` リスナーが呼び出されているか（呼び出されていない場合、表示対象のメッセージが存在しないか、条件を満たしていない可能性があります）
 
 ### エラーが発生する場合
 
@@ -286,6 +313,7 @@ class YourApplication : Application() {
 
 - `ClientError`: API Key または Tenant ID が正しく設定されているか確認してください
 - `ServerError` / `NetworkError`: 時間をおいて再試行してください
+- `Precondition`: SDK が対応していない値を受信した場合にもコールされます（`msg` プロパティに受信した値が含まれます）。この場合、対象のメッセージは表示されません。SDK を最新版へ更新してください
 
 ---
 
@@ -327,13 +355,15 @@ fun setup(context: Context, apiKey: String, tenantId: String, apiHost: String? =
 
 SDKの初期化を行います。`apiHost` を省略または `null` にすると本番エンドポイントを使用します。`apiHost` を指定する場合は有効な `http` / `https` URL を渡してください。有効な URL でない値を渡した場合は例外を投げず、新しい構成は適用されません（後続の `screenView` で `messageError` に `AimstarException.Precondition` が通知されます）。
 
+Main スレッドからの呼び出しを想定しています。Main スレッド以外から呼び出した場合は crash せず Main スレッドへ移送して適用されますが、メソッドの return 直後にはまだ構成が適用されていないことがあります。複数回呼び出した場合は、最後に呼んだ `setup` の構成が有効になります。
+
 #### setListener(listener)
 
 ```kotlin
-fun setListener(listener: AimstarInAppMessagingListener)
+fun setListener(listener: AimstarInAppMessagingListener?)
 ```
 
-イベント通知用リスナーを設定します。
+イベント通知用リスナーを設定します。`null` を設定するとリスナーを解除できます。
 
 #### screenView(activity, screenName, topAnchor?, bottomAnchor?, customBlock?)
 
@@ -348,6 +378,8 @@ fun screenView(
 ```
 
 指定した screenName でメッセージを取得・表示します（View アンカー指定）。`topAnchor` はポップアップバナー（TOP）の上端基準となる View、`bottomAnchor` はポップアップバナー（BOTTOM）の下端基準となる View です。
+
+`screenView` は必ず Main スレッドから呼び出してください（両オーバーロード共通）。Main スレッド以外から呼び出した場合、処理は行われず `messageError` に `AimstarException.Precondition` が通知されます。
 
 #### screenView(activity, screenName, topOffsetPx, bottomOffsetPx, customBlock?)
 
@@ -379,7 +411,14 @@ interface AimstarInAppMessagingListener
 fun messageDismissed(message: InAppMessage)
 ```
 
-ユーザー操作によってメッセージUIが閉じられた際にコールされます。次の `screenView` 呼び出しによるプログラム的な撤去や、画像ロード失敗で一度も可視状態にならなかった場合はコールされません。
+ユーザー操作によってメッセージUIが閉じられた際にコールされます。以下のプログラム的な撤去ではコールされません。
+
+- `screenName` または Activity が変わる `screenView` 呼び出しに伴う撤去
+- 新しい取得結果に含まれない位置のポップアップバナーの撤去
+- 新しいポップアップモーダルへの差し替えに伴う、表示中モーダルの撤去
+- 画像ロード失敗で一度も可視状態にならなかった場合
+
+また、埋め込みバナーは閉じる操作を持たないため、このコールバックの対象になりません。
 
 #### messageClicked(message)
 
@@ -395,7 +434,7 @@ fun messageClicked(message: InAppMessage)
 fun messageDetectedForDisplay(message: InAppMessage)
 ```
 
-メッセージUIを表示すべき対象のメッセージが検出された際にコールされます。このコールバックが呼ばれた時点ではまだメッセージはユーザーに可視とは限りません。OPEN リアクションは、メッセージがユーザーに可視になった時点で別途サーバーに送信されます。
+メッセージUIを表示すべき対象のメッセージが検出された際にコールされます。発火タイミングはメッセージ種別によって異なり、ポップアップバナーは表示直前（同一位置に複数のバナーが取得された場合、待機中のバナーは先行バナーが閉じられ表示順が来た時点）、ポップアップモーダルと埋め込みバナーは表示準備を開始した時点でコールされます。このコールバックが呼ばれた時点ではまだメッセージはユーザーに可視とは限りません。OPEN リアクションは、メッセージがユーザーに可視になった時点で別途サーバーに送信されます。
 
 #### messageError(message, error)
 
@@ -403,7 +442,7 @@ fun messageDetectedForDisplay(message: InAppMessage)
 fun messageError(message: InAppMessage?, error: AimstarException)
 ```
 
-SDK内でメッセージの取得や表示の際にエラーが発生した場合にコールされます。`message` が `null` の場合はネットワーク通信などメッセージ特定前のエラーを示します。
+SDK内でメッセージの取得や表示の際にエラーが発生した場合にコールされます。`message` が `null` の場合はネットワーク通信などメッセージ特定前のエラーを示します。画像ロードに失敗し、タイトル・本文（ポップアップ系はボタンも）も無いために表示できるコンテンツが残らなかった場合も、本メソッドが `AimstarException.NetworkError` で通知します（テキストが表示できる場合は、そのテキストで表示を成立させるため通知しません）。この場合メッセージは表示されず、OPEN / CLOSE リアクションと `messageDismissed` は発火しません。
 
 ## IAMEmbeddedBannerView (View)
 
@@ -411,16 +450,33 @@ SDK内でメッセージの取得や表示の際にエラーが発生した場�
 class IAMEmbeddedBannerView : FrameLayout
 ```
 
-View環境（XML レイアウト）用の埋め込みバナーコンポーネントです。`app:componentId` 属性で ComponentID を指定します。
+View環境（XML レイアウト）用の埋め込みバナーコンポーネントです。
+
+| 属性 | 型 | デフォルト | 説明 |
+| - | - | - | - |
+| `app:componentId` | `String` | - | 表示対象の ComponentID。 |
+| `app:showsLoadingPlaceholder` | `Boolean` | `false` | 取得・画像ロード中にプレースホルダー（shimmer）を表示するかどうか。`false` の場合は高さ 0 に折りたたまれ、表示可能になった時点でバナーが現れます。 |
+
+`showsLoadingPlaceholder` は同名の Kotlin プロパティとしても公開されており、Main スレッドから実行時に変更できます（ロード中の変更は表示へ即時反映されます）。`componentId` は XML 属性でのみ指定できます。
 
 ## IAMEmbeddedBanner (Compose)
 
 ```kotlin
 @Composable
-fun IAMEmbeddedBanner(componentId: String, modifier: Modifier = Modifier)
+fun IAMEmbeddedBanner(
+    componentId: String,
+    modifier: Modifier = Modifier,
+    showsLoadingPlaceholder: Boolean = false,
+)
 ```
 
 Jetpack Compose 用の埋め込みバナーコンポーネントです。`componentId` を指定して利用します。
+
+| パラメータ | 型 | デフォルト | 説明 |
+| - | - | - | - |
+| `componentId` | `String` | - | 表示対象の ComponentID。 |
+| `modifier` | `Modifier` | `Modifier` | 画像は内部で高さを占有するため、`height(N.dp)` などで高さを確定させてください（未確定だと画像が高さ 0 になることがあります）。 |
+| `showsLoadingPlaceholder` | `Boolean` | `false` | 取得・画像ロード中にプレースホルダー（shimmer）を表示するかどうか。`false` の場合は高さ 0 に折りたたまれ、表示可能になった時点でバナーが現れます。 |
 
 ## CustomParameterBuilder
 
@@ -450,7 +506,9 @@ sealed class AimstarException : Exception()
 | `Precondition(msg)` | 内部不整合などの前提条件エラー。リトライ不可。 |
 | `ClientError(httpStatusCode)` | 4xx レスポンスに起因するクライアントエラー。リトライ不可。 |
 | `ServerError(httpStatusCode)` | 5xx レスポンスに起因するサーバーエラー。リトライ可能。 |
-| `NetworkError(exception)` | ネットワーク通信エラー。リトライ可能。 |
+| `NetworkError(exception)` | ネットワーク通信または画像デコードのエラー。リトライ可能。 |
+
+いずれのサブクラスも `Exception` 標準の `message` / `cause` は設定されません。エラー内容は各サブクラスのプロパティ（`Precondition.msg`、`ClientError.httpStatusCode`、`ServerError.httpStatusCode`、`NetworkError.exception`）から取得してください。
 
 ## InAppMessage
 
@@ -465,7 +523,7 @@ SDKが取り扱うメッセージの型です。リスナーメソッドの引�
 | `PopupModalMessage` | ポップアップモーダルのメッセージ。 |
 | `PopupBannerMessage` | ポップアップバナーのメッセージ。 |
 | `EmbeddedBannerMessage` | 埋め込みバナーのメッセージ。 |
-| `Unsupported(rawType: String)` | 未知の `action_type` を受信した際のフォールバック。将来のバックエンド拡張に対する前方互換ケースです。`messageError` 経由ではなく `messageDetectedForDisplay` などで通常通り渡されます。`rawType` には受信した生の type 文字列が入ります。 |
+| `Unsupported(rawType: String)` | SDK が対応していない値（未知の `action_type` や表示位置）を受信した際のフォールバック。将来のバックエンド拡張に対する前方互換ケースで、配信全体を失わせないために用意されています。**表示は行われず、`messageError` に `AimstarException.Precondition` として通知されます。** `rawType` には受信した生の値が入ります。 |
 
 ### PopupModalMessage
 
@@ -473,9 +531,7 @@ SDKが取り扱うメッセージの型です。リスナーメソッドの引�
 
 ### PopupBannerMessage
 
-| プロパティ | 型 | 説明 |
-| - | - | - |
-| `margin` | `Margin` | バナーの外側余白。デフォルトは `Margin()`（全方向 0）。 |
+リスナー経由で受け取った後は内部表示用としてのみ使われます。公開プロパティはありません。
 
 ### EmbeddedBannerMessage
 

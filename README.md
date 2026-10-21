@@ -165,6 +165,61 @@ AimstarInAppMessaging.screenView(
 )
 ```
 
+#### 1 つの Activity 内で画面を切り替える場合（Fragment / Navigation / Compose）
+
+Fragment や Navigation Compose などで 1 つの Activity の中に複数の画面を持つ場合、画面が入れ替わっても Activity は変わりません。同じ `screenName` の画面に新しく入り直したときに新しい表示サイクルとして扱われるよう、`owner` に画面インスタンスを識別するオブジェクトを渡してください。`owner` は画面が同じインスタンスかどうかの判定だけに使われ、SDK は弱参照で保持します。省略した場合は `activity` が使われ、Activity 単位で判定されます。詳細は「[表示サイクルと owner](#表示サイクルと-owner)」を参照してください。
+
+```kotlin
+// Fragment: Fragment 自身を渡す
+override fun onResume() {
+    super.onResume()
+    AimstarInAppMessaging.screenView(
+        activity = requireActivity(),
+        screenName = "Product Detail",
+        owner = this
+    )
+}
+```
+
+```kotlin
+// Navigation Compose: NavBackStackEntry を渡す
+composable("product/{id}") { backStackEntry ->
+    val activity = LocalContext.current as Activity
+    // ポップアップバナーの上下端オフセット（px）。ここではアプリバーの高さ 56dp とナビゲーションバーの高さ 80dp を例にしている
+    val topBarHeightPx = with(LocalDensity.current) { 56.dp.roundToPx() }
+    val bottomBarHeightPx = with(LocalDensity.current) { 80.dp.roundToPx() }
+    LaunchedEffect(backStackEntry) {
+        AimstarInAppMessaging.screenView(
+            activity = activity,
+            screenName = "Product Detail",
+            topOffsetPx = topBarHeightPx,
+            bottomOffsetPx = bottomBarHeightPx,
+            owner = backStackEntry
+        )
+    }
+}
+```
+
+```kotlin
+// Compose（Navigation を使わない場合）: 画面ごとに remember したオブジェクトを渡す
+@Composable
+fun ProductDetailScreen() {
+    val activity = LocalContext.current as Activity
+    val topBarHeightPx = with(LocalDensity.current) { 56.dp.roundToPx() }
+    val bottomBarHeightPx = with(LocalDensity.current) { 80.dp.roundToPx() }
+    val screenOwner = remember { Any() }
+    LaunchedEffect(screenOwner) {
+        AimstarInAppMessaging.screenView(
+            activity = activity,
+            screenName = "Product Detail",
+            topOffsetPx = topBarHeightPx,
+            bottomOffsetPx = bottomBarHeightPx,
+            owner = screenOwner
+        )
+    }
+}
+```
+
 #### 埋め込みバナー
 
 アプリの任意の場所にバナーを埋め込む場合は、埋め込みバナーコンポーネントを使用します。埋め込みバナーのコンテンツを読み込むには、`screenView` の呼び出しが必要です。
@@ -243,6 +298,82 @@ AimstarInAppMessaging.screenView(activity = this, screenName = "Your Screen Name
 
 対応する型: `putString`, `putInteger`, `putDouble`, `putBoolean`, `putStringList`, `putIntegerList`, `putDoubleList`, `putBooleanList`
 
+### 7. 商品コンテキストの送信
+
+`screenView` には、表示中の商品や商品グループを「商品コンテキスト」（`productId` / `productGroups`）として渡せます。AIMSTAR 管理画面で商品軸レコメンド（閲覧中の商品を起点に商品を推薦する配信）を設定している場合、この値が起点の決定に使われます。
+
+`screenView` を呼ぶと画面表示のリクエストが送られ、その後メッセージの表示・ユーザー操作による非表示・コンバージョンボタンのタップが起きるたびにイベントが送られます。前項のカスタムパラメータ（`customBlock`）とは、どちらに含まれるかが異なります。
+
+- **カスタムパラメータ**: `screenView` のリクエストにのみ含まれます
+- **商品コンテキスト**: `screenView` のリクエストに加え、次に `screenView` を呼ぶまでに発生するイベントにも含まれます
+
+起点となる商品は、渡した商品コンテキストと管理画面のコンテンツ設定（どの枠名を使うか）の組み合わせで決まります。カスタムパラメータに同じ値を入れても起点の決定には使われません。
+
+#### 商品詳細画面: productId
+
+表示中の商品が1つに定まる画面（商品詳細画面など）では `productId` を渡してください。
+
+**View:**
+
+```kotlin
+AimstarInAppMessaging.screenView(
+    activity = this,
+    screenName = "Product Detail",
+    productId = product.id
+)
+```
+
+**Jetpack Compose:**
+
+```kotlin
+AimstarInAppMessaging.screenView(
+    activity = this,
+    screenName = "Product Detail",
+    topOffsetPx = topBarHeightPx,
+    bottomOffsetPx = bottomBarHeightPx,
+    productId = product.id
+)
+```
+
+#### カテゴリ・一覧画面: productGroups
+
+複数の商品グループを同時に表示する画面（カテゴリ・一覧画面など）では `productGroups` を渡してください。キーは AIMSTAR 管理画面のコンテンツ設定で指定した枠名（`product_group_id_01`〜`product_group_id_10`）、値はその枠に表示しているグループの値です。
+
+**View:**
+
+```kotlin
+AimstarInAppMessaging.screenView(
+    activity = this,
+    screenName = "Category List",
+    productGroups = mapOf(
+        "product_group_id_01" to category.id,
+        "product_group_id_02" to brand.id
+    )
+)
+```
+
+**Jetpack Compose:**
+
+```kotlin
+AimstarInAppMessaging.screenView(
+    activity = this,
+    screenName = "Category List",
+    topOffsetPx = topBarHeightPx,
+    bottomOffsetPx = bottomBarHeightPx,
+    productGroups = mapOf(
+        "product_group_id_01" to category.id,
+        "product_group_id_02" to brand.id
+    )
+)
+```
+
+#### 注意点
+
+- 商品画面以外（トップ画面・カート画面など、商品軸に紐付かない画面）では `productId` / `productGroups` を省略してください
+- 省略した場合、送信データに当該キー自体が含まれません（未指定時のリクエストは従来と同一です）
+- SDK は枠名（`product_group_id_01`〜`product_group_id_10`）や値の検証・補完を行いません。**管理画面で枠名を指定しているレコメンドでは、その枠名の値が届かないと配信そのものが行われません。** AIMSTAR 管理画面のコンテンツ設定と一致する枠名を呼び出し側で指定してください
+- `productGroups` に渡した `Map` は呼び出し時点でコピーされます。呼び出し後に元の `Map` を変更しても、送信される値には反映されません
+
 ---
 
 # 利用ガイド
@@ -251,7 +382,7 @@ AimstarInAppMessaging.screenView(activity = this, screenName = "Your Screen Name
 
 SDK にはポップアップの表示を抑制する機能がありません。メッセージを表示したくないタイミングがある場合は、`messageDetectedForDisplay` / `messageDismissed` リスナーを活用し、アプリ側で `screenView` 呼び出しを制御してください。
 
-`screenName` または Activity が変わる呼び出しでは、表示中のポップアップが撤去されます（詳細は「[同一画面で再度 screenView を呼び出した場合](#同一画面で再度-screenview-を呼び出した場合)」を参照）。画面遷移で表示中のメッセージを消したくない場合や、そもそもメッセージを出したくないタイミングがある場合は、以下のように `screenView` の呼び出し自体を制御してください。
+`screenName` または画面（`owner`、省略時は Activity）が変わる呼び出しでは、表示中のポップアップが撤去されます（詳細は「[同一画面で再度 screenView を呼び出した場合](#同一画面で再度-screenview-を呼び出した場合)」を参照）。画面遷移で表示中のメッセージを消したくない場合や、そもそもメッセージを出したくないタイミングがある場合は、以下のように `screenView` の呼び出し自体を制御してください。
 
 ```kotlin
 class YourApplication : Application() {
@@ -290,7 +421,7 @@ class YourApplication : Application() {
 
 ## 同一画面で再度 screenView を呼び出した場合
 
-同じ `screenName`・同じ Activity で再度 `screenView` を呼び出した場合（コンテンツの更新、pull-to-refresh、画面復帰など）、表示中のポップアップは原則として維持されます。ポップアップバナーとポップアップモーダルで挙動が異なります。
+SDK は `screenName` と画面（`owner`、省略時は Activity）の組で「同じ画面かどうか」を判定し、同じ画面での `screenView` 呼び出しを 1 つの表示サイクルとして扱います（表示サイクルについては「[表示サイクルと owner](#表示サイクルと-owner)」を参照）。同じ `screenName`・同じ画面で再度 `screenView` を呼び出した場合（コンテンツの更新、pull-to-refresh、画面復帰など）、表示中のポップアップは原則として維持されます。ポップアップバナーとポップアップモーダルで挙動が異なります。
 
 **ポップアップバナー**
 
@@ -305,9 +436,24 @@ class YourApplication : Application() {
 
 **共通**
 
-- **`screenName` または Activity が変わる呼び出し**: 表示中のポップアップはバナー・モーダルともすべて撤去されます
+- **`screenName` または画面（`owner`、省略時は Activity）が変わる呼び出し**: 表示中のポップアップはバナー・モーダルともすべて撤去されます
 
-`screenName` は「同じ画面かどうか」の判定に使われます。**内容が変わる画面に同一の `screenName` を使い回すと、前の内容向けのバナーが次の内容の画面に残る場合があります。** 論理的な画面ごとに一意な `screenName` を指定してください。
+`screenName` と画面（`owner`）は「同じ画面かどうか」の判定に使われます。**内容が変わる画面に同一の `screenName` を使い回すと、前の内容向けのバナーが次の内容の画面に残る場合があります。** 論理的な画面ごとに一意な `screenName` を指定してください。商品詳細のように、同じ `screenName` の画面へ何度も入り直す構成では、画面インスタンスごとに異なる `owner` を渡してください（「[表示サイクルと owner](#表示サイクルと-owner)」を参照）。
+
+### 表示サイクルと owner
+
+表示サイクルとは、メッセージの表示・OPEN の送信を 1 まとまりとして管理する単位です。`screenName` と画面（`owner`）の組が変わると新しい表示サイクルが始まり、表示中のポップアップが撤去され、ポップアップや埋め込みバナーの OPEN は新しい画面として再送されます。同じ組での `screenView` は同じ表示サイクルのままで、表示中のメッセージと OPEN 送信済みの記録を維持します。
+
+| 状況 | `owner` を渡した場合 | `owner` を省略した場合 |
+| - | - | - |
+| 同じ画面インスタンスへ戻る（戻るボタン、遷移先からの復帰）・同じ画面での再取得 | 同じ表示サイクル | 同じ表示サイクル |
+| 同じ `screenName` の新しい画面インスタンスに入る（Fragment を作り直す、同じ宛先へ再度 navigate するなど） | 新しい表示サイクル | 同じ表示サイクル（Activity が同じため） |
+| 別の `screenName` の画面に入る | 新しい表示サイクル | 新しい表示サイクル |
+| 別の Activity に入る | 新しい表示サイクル | 新しい表示サイクル |
+
+- `owner` には、画面インスタンスごとに 1 つ決まるオブジェクト（Fragment、NavBackStackEntry、Compose で `remember` したオブジェクトなど）を渡します。同じ画面の間は常に同じオブジェクトを渡してください。呼び出しのたびに新しいオブジェクトを作って渡すと、毎回新しい表示サイクルになります
+- 画面回転などの構成変更で Activity が再生成された場合、再生成された画面が表示された直後の最初の `screenView` は、同じ `screenName` であれば、`owner` が新しいインスタンス（再生成された Fragment、`remember` し直したオブジェクトなど）でも同じ表示サイクルとして扱われ、表示中のポップアップと OPEN 送信済みの記録を維持します。この引き継ぎは最初の 1 回だけで、その後に別の `owner` で呼ぶと新しい表示サイクルになります。`finish` や戻る操作による破棄、別の画面への遷移では引き継がれず、`owner` が変われば新しい表示サイクルです
+- 引き継ぎが効くのは、再生成後に画面が表示された（`onResume` 以降の）直後、数フレームのうちに `screenView` を呼んだ場合です。Fragment なら `onResume`、Compose なら画面表示後に実行される `LaunchedEffect` などから呼んでください。`Activity.onCreate` や Fragment の `onViewCreated` / `onStart` など表示より前に呼んだ場合や、再生成後しばらくしてから呼んだ場合は引き継がれず、`owner` が変われば新しい表示サイクルになります
 
 ## 埋め込みバナーの実装時の注意点
 
@@ -320,7 +466,19 @@ class YourApplication : Application() {
 
 メッセージのボタン・画像・バナーに設定されたリンク URL は、タップ時に `Intent.ACTION_VIEW` で起動されます。Web ページ（`https`）のほか、`myapp://item/123` のようなカスタムスキームによるディープリンクで自アプリの画面を開くこともできます。
 
-セキュリティ上の理由から、`javascript` / `data` / `file` / `intent` などスクリプト実行や任意コンポーネント起動につながる一部のスキームは拒否されます。拒否された場合、リンクは開かれず `messageError` に `AimstarException.Precondition`（`Invalid link URL: ...`）が通知されます。このときメッセージが閉じるかどうかはリンクの有効性ではなくタップ対象によって決まります。画像のタップとポップアップバナーのボタンのタップではメッセージの表示が継続しますが、ポップアップモーダルのポジティブボタンはリンクの有効性に関わらずタップ後にモーダルが閉じます。スキームを持たない文字列も同様に無効として扱われます。スキームの大文字小文字は区別されません。
+### 開けるスキーム
+
+以下の 9 スキームは、スクリプト実行・ローカルリソース参照・任意コンポーネント起動につながるため開かずに拒否します。これ以外は、`https` などの Web リンクもアプリ独自のカスタムスキームも含めて開きます。
+
+```
+javascript / data / vbscript / blob / file / about / content / intent / android-app
+```
+
+- スキームの判定は大文字小文字を区別しません（`YourApp://` は `yourapp://` と同じ扱いです）
+- スキームを持たない文字列（`example.com/path` など）は開けないため拒否します
+- URL に空白・改行が含まれる場合は、除去してから判定・起動します
+- 拒否した場合と URL の形式が不正な場合は、`messageError` に `AimstarException.Precondition`（`Invalid link URL: ...`）で通知します。リンクが設定されていない場合は、何も起こらず通知もされません
+- 拒否されたときにメッセージが閉じるかどうかは、リンクの有効性ではなくタップ対象によって決まります。画像のタップとポップアップバナーのボタンのタップでは表示が継続しますが、ポップアップモーダルのポジティブボタンはリンクの有効性に関わらずタップ後にモーダルが閉じます
 
 ### カスタムスキームで自アプリの画面を開く
 
@@ -479,7 +637,7 @@ override fun onDestroy() {
 
 `Application` スコープのオブジェクトをリスナーにしている場合は解除不要です。
 
-#### screenView(activity, screenName, topAnchor?, bottomAnchor?, customBlock?)
+#### screenView(activity, screenName, topAnchor?, bottomAnchor?, productId?, productGroups?, owner?, customBlock?)
 
 ```kotlin
 fun screenView(
@@ -487,15 +645,24 @@ fun screenView(
     screenName: String,
     topAnchor: View? = null,
     bottomAnchor: View? = null,
+    productId: String? = null,
+    productGroups: Map<String, String>? = null,
+    owner: Any = activity,
     customBlock: CustomParameterBuilder.() -> Unit = {}
 )
 ```
 
 指定した screenName でメッセージを取得・表示します（View アンカー指定）。`topAnchor` はポップアップバナー（TOP）の上端基準となる View、`bottomAnchor` はポップアップバナー（BOTTOM）の下端基準となる View です。
 
+`productId` は表示中の商品ID（商品軸レコメンド用）、`productGroups` は表示中の商品グループ（キーは枠名 `product_group_id_01`〜`product_group_id_10`、値はグループの値）です。いずれも商品画面以外では省略してください。省略した場合、送信データに含まれません（詳細は「[商品コンテキストの送信](#7-商品コンテキストの送信)」を参照）。
+
+`owner` は画面インスタンスを識別するオブジェクトです。同じ `screenName` でも `owner` が変われば新しい表示サイクルとして扱い、OPEN を再送します。同じ `owner` での呼び出し（画面復帰・再取得）は同じ表示サイクルのままです。Fragment、NavBackStackEntry、Compose で `remember` したオブジェクトをそのまま渡せます（同一性の判定だけに使い、SDK は弱参照で保持します）。省略した場合は `activity` が使われ、Activity 単位で判定されます（詳細は「[表示サイクルと owner](#表示サイクルと-owner)」を参照）。
+
+Java から呼ぶ場合は名前付き引数がなく、`owner` が `customBlock` の前に位置します。`customBlock` を渡すときは `owner` も省略せずに明示してください（引数の順序は `owner`、`customBlock` の順です）。関数型（`customBlock`）が `owner` に渡された場合は取り違えとみなし、`messageError` に `AimstarException.Precondition` が通知されて呼び出しは無視されます。
+
 `screenView` は必ず Main スレッドから呼び出してください（両オーバーロード共通）。Main スレッド以外から呼び出した場合、処理は行われず `messageError` に `AimstarException.Precondition` が通知されます。
 
-#### screenView(activity, screenName, topOffsetPx, bottomOffsetPx, customBlock?)
+#### screenView(activity, screenName, topOffsetPx, bottomOffsetPx, productId?, productGroups?, owner?, customBlock?)
 
 ```kotlin
 fun screenView(
@@ -503,11 +670,14 @@ fun screenView(
     screenName: String,
     topOffsetPx: Int,
     bottomOffsetPx: Int,
+    productId: String? = null,
+    productGroups: Map<String, String>? = null,
+    owner: Any = activity,
     customBlock: CustomParameterBuilder.() -> Unit = {}
 )
 ```
 
-px オフセット指定でメッセージを取得・表示します（Compose 向け）。`topOffsetPx` はウィンドウ上端からの絶対距離、`bottomOffsetPx` はウィンドウ下端からの絶対距離です。
+px オフセット指定でメッセージを取得・表示します（Compose 向け）。`topOffsetPx` はウィンドウ上端からの絶対距離、`bottomOffsetPx` はウィンドウ下端からの絶対距離です。`productId` / `productGroups` / `owner` の扱いは上記と同じです。
 
 ## AimstarInAppMessagingListener
 
@@ -532,7 +702,7 @@ fun messageDismissed(message: InAppMessage)
 
 以下のプログラム的な撤去ではコールされません。
 
-- `screenName` または Activity が変わる `screenView` 呼び出しに伴う撤去
+- `screenName` または画面（`owner`、省略時は Activity）が変わる `screenView` 呼び出しに伴う撤去
 - 新しい取得結果に含まれない位置のポップアップバナーの撤去
 - 新しいポップアップモーダルへの差し替えに伴う、表示中モーダルの撤去
 - 画像ロード失敗で一度も可視状態にならなかった場合
@@ -580,7 +750,7 @@ SDK内でメッセージの取得や表示の際にエラーが発生した場�
 `AimstarException.Precondition` は以下の場合に通知されます。
 
 - SDK が対応していない値（未知の `action_type` や表示位置）を受信した場合。対象のメッセージは表示されません
-- メッセージに設定されたリンク URL が遷移先として無効な場合（スキームを持たない、または `javascript` / `data` / `file` / `intent` / `content` などの拒否スキーム）。リンクは開かれません（メッセージが閉じるかどうかはタップ対象によって決まります。「[リンク URL の遷移とディープリンク](#リンク-url-の遷移とディープリンク)」を参照してください）
+- メッセージに設定されたリンク URL が遷移先として無効な場合（スキームを持たない、または拒否スキーム。一覧は「[開けるスキーム](#開けるスキーム)」を参照してください）。リンクは開かれません（メッセージが閉じるかどうかはタップ対象によって決まります。「[リンク URL の遷移とディープリンク](#リンク-url-の遷移とディープリンク)」を参照してください）
 - `setup()` を呼ぶ前に `screenView` を呼び出した場合
 - `setup()` に無効な `apiHost` を渡した後に `screenView` を呼び出した場合
 - `screenView` を Main スレッド以外から呼び出した場合

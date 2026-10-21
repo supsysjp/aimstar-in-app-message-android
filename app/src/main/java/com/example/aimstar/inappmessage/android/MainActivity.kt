@@ -78,4 +78,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    override fun onDestroy() {
+        // リスナーを匿名 object で渡しているため、外側の MainActivity が暗黙に参照される。
+        // SDK は object シングルトンとしてリスナーを保持するので、解除しないとこの Activity が
+        // プロセスの生存中参照され続ける。
+        AimstarInAppMessaging.setListener(null)
+        super.onDestroy()
+    }
 }
